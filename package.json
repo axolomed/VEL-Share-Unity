@@ -1,6 +1,6 @@
 {
 	"name": "edu.uga.engr.vel.velshareunity",
-	"version":"1.0.0",
+	"version":"1.0.1",
 	"displayName": "VEL Share Unity",
 	"description": "This is used in concert with the VEL Share Application",
 	"dependencies": {
