@@ -15,7 +15,6 @@ jobs:
           registry-url: http://npm.ugavel.com/
       - name: actually publish
         run: |
-          cd unity_package
           npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.VERDACCIO_TOKEN}}
