@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "Unity.WebRTC",
-        "endel.nativewebsocket"
+        "endel.nativewebsocket",
+        "VelNet"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
