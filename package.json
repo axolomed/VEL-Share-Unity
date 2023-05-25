@@ -1,6 +1,7 @@
 {
+  "author": "Virtual Experiences Laboratory",
   "name": "edu.uga.engr.vel.velshareunity",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "displayName": "VEL Share Unity",
   "description": "This is used in concert with the VEL Share Application",
   "dependencies": {

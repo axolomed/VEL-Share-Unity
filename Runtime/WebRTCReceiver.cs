@@ -88,7 +88,7 @@ namespace velshareunity
 
 		public void Shutdown()
 		{
-
+			Disconnect();
 			localPeerConnection?.Close();
 			audioStreamTrack = null;
 		}
@@ -108,6 +108,7 @@ namespace velshareunity
 
 		public void Startup(string room)
 		{
+			Shutdown();
 			streamRoom = room;
 			//connect to the json server
 			webSocket = new WebSocket(signalingUrl);
@@ -121,7 +122,7 @@ namespace velshareunity
 
 			webSocket.OnClose += _ =>
 			{
-				Debug.Log("Connection closed!");
+				//Debug.Log("Connection closed!");
 			};
 
 
@@ -146,12 +147,12 @@ namespace velshareunity
 			remotePeerConnection = new RTCPeerConnection();
 			remotePeerConnection.OnIceCandidate += (candidate) =>
 			{
-				Debug.Log("remote peer got candidate");
+				//Debug.Log("remote peer got candidate");
 				SubmitCandidate(candidate, 1);
 			};
 			remotePeerConnection.OnDataChannel += _ =>
 			{
-				Debug.Log("Data channel received");
+				//Debug.Log("Data channel received");
 			};
 			remotePeerConnection.OnTrack += (e) => OnTrack(remotePeerConnection, e);
 			remotePeerConnection.OnNegotiationNeeded = () =>
@@ -177,7 +178,7 @@ namespace velshareunity
 		private void HandleWebsocketMessage(byte[] data)
 		{
 			string response = Encoding.UTF8.GetString(data);
-			Debug.Log(response);
+			//Debug.Log(response);
 
 			Dictionary<string, object> test = JsonConvert.DeserializeObject<Dictionary<string, object>>(response);
 
@@ -255,7 +256,7 @@ namespace velshareunity
 
 		private void HandleWebsocketOpen()
 		{
-			Debug.Log("websocket opened");
+			//Debug.Log("websocket opened");
 
 
 			StartCoroutine(InitiateRTC());
@@ -279,28 +280,28 @@ namespace velshareunity
 			switch (state)
 			{
 				case RTCIceConnectionState.New:
-					Debug.Log($"IceConnectionState: New");
+					//Debug.Log($"IceConnectionState: New");
 					break;
 				case RTCIceConnectionState.Checking:
-					Debug.Log($"IceConnectionState: Checking");
+					//Debug.Log($"IceConnectionState: Checking");
 					break;
 				case RTCIceConnectionState.Closed:
-					Debug.Log($"IceConnectionState: Closed");
+					//Debug.Log($"IceConnectionState: Closed");
 					break;
 				case RTCIceConnectionState.Completed:
-					Debug.Log($"IceConnectionState: Completed");
+					//Debug.Log($"IceConnectionState: Completed");
 					break;
 				case RTCIceConnectionState.Connected:
-					Debug.Log($"IceConnectionState: Connected");
+					//Debug.Log($"IceConnectionState: Connected");
 					break;
 				case RTCIceConnectionState.Disconnected:
-					Debug.Log($"IceConnectionState: Disconnected");
+					//Debug.Log($"IceConnectionState: Disconnected");
 					break;
 				case RTCIceConnectionState.Failed:
-					Debug.Log($"IceConnectionState: Failed");
+					//Debug.Log($"IceConnectionState: Failed");
 					break;
 				case RTCIceConnectionState.Max:
-					Debug.Log($"IceConnectionState: Max");
+					//Debug.Log($"IceConnectionState: Max");
 					break;
 				default:
 					throw new ArgumentOutOfRangeException(nameof(state), state, null);
@@ -337,14 +338,14 @@ namespace velshareunity
 			};
 
 			string toSend = JsonConvert.SerializeObject(rpc);
-			Debug.Log(toSend);
+			//Debug.Log(toSend);
 
 			webSocket.Send(Encoding.UTF8.GetBytes(toSend));
 		}
 
 		private void OnTrack(RTCPeerConnection pc, RTCTrackEvent e)
 		{
-			Debug.Log("Adding track");
+			//Debug.Log("Adding track");
 			if (e.Track is AudioStreamTrack audioTrack)
 			{
 				outputAudioSource.SetTrack(audioTrack);
@@ -354,7 +355,7 @@ namespace velshareunity
 
 			if (e.Track is VideoStreamTrack videoTrack)
 			{
-				Debug.Log("Initializing receiving");
+				//Debug.Log("Initializing receiving");
 				videoTrack.OnVideoReceived += tex =>
 				{
 					if (this.receivedVideoMat)
@@ -384,7 +385,7 @@ namespace velshareunity
 		private void RtcOffer(string sdp)
 		{
 
-			Debug.Log("got offer: " + sdp);
+			//Debug.Log("got offer: " + sdp);
 			RTCSessionDescription offer = new RTCSessionDescription
 			{
 				sdp = sdp,
@@ -403,7 +404,7 @@ namespace velshareunity
 				Debug.Log(op.Error.message);
 			}
 
-			Debug.Log("Set Remote Description " + offer.sdp);
+			//Debug.Log("Set Remote Description " + offer.sdp);
 
 			RTCSessionDescriptionAsyncOperation op2 = remotePeerConnection.CreateAnswer();
 			yield return op2;
@@ -412,7 +413,7 @@ namespace velshareunity
 				Debug.Log(op2.Error.message);
 			}
 
-			Debug.Log("Created answer: " + op2.Desc.sdp);
+			//Debug.Log("Created answer: " + op2.Desc.sdp);
 			RTCSessionDescription desc = op2.Desc;
 
 
@@ -423,7 +424,7 @@ namespace velshareunity
 				Debug.Log(op3.Error.message);
 			}
 
-			Debug.Log("Set local description to: " + desc);
+			//Debug.Log("Set local description to: " + desc);
 
 			AnswerJSON answerJSON = new AnswerJSON
 			{
@@ -446,7 +447,7 @@ namespace velshareunity
 		//this is from the remote 
 		private void RtcCandidate(TrickleJSON trickle)
 		{
-			Debug.Log("got rtc candidate: " + trickle.candidate);
+			//Debug.Log("got rtc candidate: " + trickle.candidate);
 			//not so sure about this
 			RTCIceCandidateInit init = new RTCIceCandidateInit
 			{
@@ -475,7 +476,11 @@ namespace velshareunity
 
 		public void OnEnable()
 		{
-			if (initializeOnStart) Startup(streamRoom);
+			Startup(streamRoom);
+		}
+		public void OnDisable()
+		{
+			Shutdown();
 		}
 
 	}
