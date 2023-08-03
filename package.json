@@ -6,6 +6,6 @@
   "description": "This is used in concert with the VEL Share Application",
   "dependencies": {
     "com.unity.webrtc": "3.0.0-pre.5",
-    "edu.uga.engr.vel.velnet": ""
+    "edu.uga.engr.vel.velnet": "1.1.8"
   }
 }
