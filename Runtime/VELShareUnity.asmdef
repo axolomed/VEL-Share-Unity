@@ -1,6 +1,6 @@
 {
     "name": "VELShareUnity",
-    "rootNamespace": "",
+    "rootNamespace": "VELShareUnity",
     "references": [
         "Unity.WebRTC",
         "endel.nativewebsocket",

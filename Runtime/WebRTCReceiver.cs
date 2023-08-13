@@ -7,16 +7,18 @@ using Newtonsoft.Json;
 using System;
 using System.Text;
 using System.Linq;
-namespace velshareunity
+
+namespace VELShareUnity
 {
 	public class WebRTCReceiver : MonoBehaviour
 	{
-		//some of these may be unecessary since removing the sender code, which isn't as relevant now that velshare exists
+		// some of these may be unecessary since removing the sender code, which isn't as relevant now that velshare exists
 		public string streamRoom = "";
 		private int nextId;
 		public bool initializeOnStart = true;
 		public Material videoMat;
 		private Material receivedVideoMat;
+		public bool applyToGlobalMaterial;
 		public string iceUrl = "stun:stun.l.google.com:19302";
 		public string signalingUrl = "wss://velnet.ugavel.com/ws";
 		private RTCPeerConnection localPeerConnection;
@@ -30,6 +32,7 @@ namespace velshareunity
 		private readonly List<RTCIceCandidate> candidates = new List<RTCIceCandidate>();
 
 		static Coroutine webRTCCoroutine; //we should only have one of these, so it's static, and started by the first one
+
 		public class RpcJSON
 		{
 			public string jsonrpc = "2.0";
@@ -70,18 +73,28 @@ namespace velshareunity
 		}
 
 		// Start is called before the first frame update
-		void Start()
+		private void Start()
 		{
 			if (webRTCCoroutine == null)
 			{
 				webRTCCoroutine = StartCoroutine(WebRTC.Update());
 			}
-			this.receivedVideoMat = new Material(videoMat);
-			previewQuad.GetComponent<MeshRenderer>().material = this.receivedVideoMat;
+
+			if (applyToGlobalMaterial)
+			{
+				receivedVideoMat = videoMat;
+				previewQuad.GetComponent<MeshRenderer>().sharedMaterial = videoMat;
+				
+			}
+			else
+			{
+				receivedVideoMat = new Material(videoMat);
+				previewQuad.GetComponent<MeshRenderer>().material = receivedVideoMat;
+			}
 		}
 
 		// Update is called once per frame
-		void Update()
+		private void Update()
 		{
 			webSocket?.DispatchMessageQueue();
 		}
@@ -115,10 +128,7 @@ namespace velshareunity
 			webSocket.OnOpen += HandleWebsocketOpen;
 			webSocket.OnMessage += HandleWebsocketMessage;
 
-			webSocket.OnError += e =>
-			{
-				Debug.Log("Error! " + e);
-			};
+			webSocket.OnError += e => { Debug.Log("Error! " + e); };
 
 			webSocket.OnClose += _ =>
 			{
@@ -128,21 +138,10 @@ namespace velshareunity
 
 			RTCConfiguration configuration = GetSelectedSdpSemantics();
 			localPeerConnection = new RTCPeerConnection(ref configuration);
-			localPeerConnection.OnIceCandidate = candidate =>
-			{
-				OnIceCandidate(localPeerConnection, candidate);
-			};
-			localPeerConnection.OnIceConnectionChange = state =>
-			{
-				OnIceConnectionChange(localPeerConnection, state);
-			};
-			localPeerConnection.OnTrack = e =>
-			{
-				OnTrack(localPeerConnection, e);
-			};
-			localPeerConnection.OnNegotiationNeeded = () =>
-			{
-			};
+			localPeerConnection.OnIceCandidate = candidate => { OnIceCandidate(localPeerConnection, candidate); };
+			localPeerConnection.OnIceConnectionChange = state => { OnIceConnectionChange(localPeerConnection, state); };
+			localPeerConnection.OnTrack = e => { OnTrack(localPeerConnection, e); };
+			localPeerConnection.OnNegotiationNeeded = () => { };
 
 			remotePeerConnection = new RTCPeerConnection();
 			remotePeerConnection.OnIceCandidate += (candidate) =>
@@ -155,13 +154,10 @@ namespace velshareunity
 				//Debug.Log("Data channel received");
 			};
 			remotePeerConnection.OnTrack += (e) => OnTrack(remotePeerConnection, e);
-			remotePeerConnection.OnNegotiationNeeded = () =>
-			{
-			};
+			remotePeerConnection.OnNegotiationNeeded = () => { };
 
 
 			Connect();
-
 		}
 
 		private RTCConfiguration GetSelectedSdpSemantics()
@@ -169,8 +165,8 @@ namespace velshareunity
 			RTCConfiguration config = default(RTCConfiguration);
 			config.iceServers = new[]
 			{
-			new RTCIceServer { urls = new[] { iceUrl } }
-		};
+				new RTCIceServer { urls = new[] { iceUrl } }
+			};
 
 			return config;
 		}
@@ -256,9 +252,6 @@ namespace velshareunity
 
 		private void HandleWebsocketOpen()
 		{
-			//Debug.Log("websocket opened");
-
-
 			StartCoroutine(InitiateRTC());
 		}
 
@@ -358,21 +351,20 @@ namespace velshareunity
 				//Debug.Log("Initializing receiving");
 				videoTrack.OnVideoReceived += tex =>
 				{
-					if (this.receivedVideoMat)
+					if (receivedVideoMat)
 					{
-						this.receivedVideoMat.mainTexture = tex;
+						receivedVideoMat.mainTexture = tex;
 						previewQuad.transform.localScale = new Vector3(tex.width / (float)tex.height, 1, 1);
 					}
-
 				};
 				//this.rawImage.texture = videoTrack.InitializeReceiver(1920, 1080);
 
 				videoStream = e.Streams.First();
 				videoStream.OnRemoveTrack = ev =>
 				{
-					if (this.receivedVideoMat)
+					if (receivedVideoMat)
 					{
-						this.receivedVideoMat.mainTexture = null;
+						receivedVideoMat.mainTexture = null;
 					}
 
 					ev.Track.Dispose();
@@ -384,7 +376,6 @@ namespace velshareunity
 		//this is received from the remote, and is where I create the remote peer
 		private void RtcOffer(string sdp)
 		{
-
 			//Debug.Log("got offer: " + sdp);
 			RTCSessionDescription offer = new RTCSessionDescription
 			{
@@ -468,7 +459,7 @@ namespace velshareunity
 		}
 
 
-		IEnumerator HandleNegotation(RTCPeerConnection pc)
+		private IEnumerator HandleNegotiation(RTCPeerConnection pc)
 		{
 			yield return null;
 		}
@@ -478,11 +469,10 @@ namespace velshareunity
 		{
 			Startup(streamRoom);
 		}
+
 		public void OnDisable()
 		{
 			Shutdown();
 		}
-
 	}
-
 }
