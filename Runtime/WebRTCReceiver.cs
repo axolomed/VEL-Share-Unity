@@ -8,11 +8,15 @@ using System;
 using System.Text;
 using System.Linq;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 namespace VELShareUnity
 {
 	public class WebRTCReceiver : MonoBehaviour
 	{
-		// some of these may be unecessary since removing the sender code, which isn't as relevant now that velshare exists
+		// some of these may be unnecessary since removing the sender code, which isn't as relevant now that velshare exists
 		public string streamRoom = "";
 		private int nextId;
 		public bool initializeOnStart = true;
@@ -31,7 +35,12 @@ namespace VELShareUnity
 		public List<RTCRtpTransceiver> transceivers = new List<RTCRtpTransceiver>();
 		private readonly List<RTCIceCandidate> candidates = new List<RTCIceCandidate>();
 
-		static Coroutine webRTCCoroutine; //we should only have one of these, so it's static, and started by the first one
+		public static WebRTCReceiver mostRecentInstance;
+		public bool isReceivingData;
+		private Dictionary<string, ulong> lastBytesReceived = new Dictionary<string, ulong>();
+
+		//we should only have one of these, so it's static, and started by the first one
+		static Coroutine webRTCCoroutine;
 
 		public class RpcJSON
 		{
@@ -72,28 +81,38 @@ namespace VELShareUnity
 			public CandidateJSON candidate;
 		}
 
-		// Start is called before the first frame update
-		private void Start()
+		private void Awake()
 		{
-			if (webRTCCoroutine == null)
-			{
-				webRTCCoroutine = StartCoroutine(WebRTC.Update());
-			}
+			mostRecentInstance = this;
+		}
 
-			if (applyToGlobalMaterial)
+		private IEnumerator Start()
+		{
+			while (enabled)
 			{
-				receivedVideoMat = videoMat;
-				previewQuad.GetComponent<MeshRenderer>().sharedMaterial = videoMat;
-				
-			}
-			else
-			{
-				receivedVideoMat = new Material(videoMat);
-				previewQuad.GetComponent<MeshRenderer>().material = receivedVideoMat;
+				if (remotePeerConnection != null)
+				{
+					RTCStatsReportAsyncOperation statsOperation = remotePeerConnection.GetStats();
+					yield return statsOperation;
+					RTCStatsReport statsReport = statsOperation.Value;
+					isReceivingData = false;
+					foreach (string statsKey in statsReport.Stats.Keys)
+					{
+						if (statsReport.Stats[statsKey].Dict.ContainsKey("kind") && (string)statsReport.Stats[statsKey].Dict["kind"] == "video")
+						{
+							ulong bytesReceived = (ulong)statsReport.Stats[statsKey].Dict["bytesReceived"];
+							ulong lastBytes = 0;
+							lastBytesReceived.TryGetValue(statsKey, out lastBytes);
+							isReceivingData |= bytesReceived > lastBytes;
+							lastBytesReceived[statsKey] = bytesReceived;
+						}
+					}
+
+					yield return new WaitForSeconds(1f);
+				}
 			}
 		}
 
-		// Update is called once per frame
 		private void Update()
 		{
 			webSocket?.DispatchMessageQueue();
@@ -184,18 +203,23 @@ namespace VELShareUnity
 
 				if (json.method == "offer")
 				{
-					OfferJSON offer = JsonConvert.DeserializeObject<OfferJSON>(JsonConvert.SerializeObject(json.@params)); //this seems stupid
+					OfferJSON offer =
+						JsonConvert.DeserializeObject<OfferJSON>(
+							JsonConvert.SerializeObject(json.@params)); //this seems stupid
 					RtcOffer(offer.sdp);
 				}
 				else if (json.method == "trickle")
 				{
-					TrickleJSON trickle = JsonConvert.DeserializeObject<TrickleJSON>(JsonConvert.SerializeObject(json.@params));
+					TrickleJSON trickle =
+						JsonConvert.DeserializeObject<TrickleJSON>(JsonConvert.SerializeObject(json.@params));
 					RtcCandidate(trickle);
 				}
 			}
-			else if (test.ContainsKey("result"))
+			else if (test.TryGetValue("result", out object value))
 			{
-				OfferJSON offerJSON = JsonConvert.DeserializeObject<OfferJSON>(JsonConvert.SerializeObject(test["result"])); //this seems stupid
+				OfferJSON offerJSON =
+					JsonConvert.DeserializeObject<OfferJSON>(
+						JsonConvert.SerializeObject(value)); //this seems stupid
 				RTCSessionDescription desc = new RTCSessionDescription
 				{
 					sdp = offerJSON.sdp,
@@ -467,6 +491,19 @@ namespace VELShareUnity
 
 		public void OnEnable()
 		{
+			webRTCCoroutine ??= StartCoroutine(WebRTC.Update());
+
+			if (applyToGlobalMaterial)
+			{
+				receivedVideoMat = videoMat;
+				previewQuad.GetComponent<MeshRenderer>().sharedMaterial = videoMat;
+			}
+			else
+			{
+				receivedVideoMat = new Material(videoMat);
+				previewQuad.GetComponent<MeshRenderer>().material = receivedVideoMat;
+			}
+
 			Startup(streamRoom);
 		}
 
@@ -475,4 +512,34 @@ namespace VELShareUnity
 			Shutdown();
 		}
 	}
+
+#if UNITY_EDITOR
+	[CustomEditor(typeof(WebRTCReceiver))]
+	public class NetworkObjectEditor : Editor
+	{
+		public override void OnInspectorGUI()
+		{
+			WebRTCReceiver t = target as WebRTCReceiver;
+
+			EditorGUILayout.Space();
+
+			if (t == null) return;
+
+			if (EditorApplication.isPlaying && GUILayout.Button("Start streaming now."))
+			{
+				t.Startup(t.streamRoom);
+			}
+
+			if (EditorApplication.isPlaying && GUILayout.Button("Stop streaming now."))
+			{
+				t.Shutdown();
+			}
+
+
+			EditorGUILayout.Space();
+
+			DrawDefaultInspector();
+		}
+	}
+#endif
 }
