@@ -39,6 +39,16 @@ namespace VELShareUnity
 		public bool isReceivingData;
 		private Dictionary<string, ulong> lastBytesReceived = new Dictionary<string, ulong>();
 
+		public bool isSender = false;
+		public RenderTexture renderTexture;
+		public uint maxBitrateKbps = 10000;
+		public uint minBitrateKbps = 3000;
+		public uint maxFramerate = 30;
+		public int streamResolutionX = 1920;
+		public int streamResolutionY = 1080;
+		public bool streamAudio;  //note, in order for this to do anything, you need to set the data for it the audioStreamTrack;
+
+
 		//we should only have one of these, so it's static, and started by the first one
 		static Coroutine webRTCCoroutine;
 
@@ -98,6 +108,7 @@ namespace VELShareUnity
 					isReceivingData = false;
 					foreach (string statsKey in statsReport.Stats.Keys)
 					{
+						
 						if (statsReport.Stats[statsKey].Dict.ContainsKey("kind") && (string)statsReport.Stats[statsKey].Dict["kind"] == "video")
 						{
 							ulong bytesReceived = (ulong)statsReport.Stats[statsKey].Dict["bytesReceived"];
@@ -106,10 +117,13 @@ namespace VELShareUnity
 							isReceivingData |= bytesReceived > lastBytes;
 							lastBytesReceived[statsKey] = bytesReceived;
 						}
+						
+
 					}
 
 					yield return new WaitForSeconds(1f);
 				}
+				yield return null;
 			}
 		}
 
@@ -297,37 +311,81 @@ namespace VELShareUnity
 			switch (state)
 			{
 				case RTCIceConnectionState.New:
-					//Debug.Log($"IceConnectionState: New");
+					Debug.Log($"IceConnectionState: New");
 					break;
 				case RTCIceConnectionState.Checking:
-					//Debug.Log($"IceConnectionState: Checking");
+					Debug.Log($"IceConnectionState: Checking");
 					break;
 				case RTCIceConnectionState.Closed:
-					//Debug.Log($"IceConnectionState: Closed");
+					Debug.Log($"IceConnectionState: Closed");
 					break;
 				case RTCIceConnectionState.Completed:
-					//Debug.Log($"IceConnectionState: Completed");
+					Debug.Log($"IceConnectionState: Completed");
 					break;
 				case RTCIceConnectionState.Connected:
-					//Debug.Log($"IceConnectionState: Connected");
+					Debug.Log($"IceConnectionState: Connected");
+					if (isSender)
+					{
+						RTCRtpSender sender = transceivers[0].Sender;
+						RTCRtpSendParameters parameters = sender.GetParameters();
+
+
+						foreach (RTCRtpEncodingParameters encoding in parameters.encodings)
+						{
+							encoding.maxBitrate = (ulong)maxBitrateKbps * 1024;
+							encoding.maxFramerate = maxFramerate;
+							encoding.minBitrate = (ulong)minBitrateKbps * 1024;
+						}
+
+
+						sender.SetParameters(parameters);
+					}
+
+
+					Debug.Log("negotiation needed for remote peer connnection");
 					break;
 				case RTCIceConnectionState.Disconnected:
-					//Debug.Log($"IceConnectionState: Disconnected");
+					Debug.Log($"IceConnectionState: Disconnected");
 					break;
 				case RTCIceConnectionState.Failed:
-					//Debug.Log($"IceConnectionState: Failed");
+					Debug.Log($"IceConnectionState: Failed");
 					break;
 				case RTCIceConnectionState.Max:
-					//Debug.Log($"IceConnectionState: Max");
+					Debug.Log($"IceConnectionState: Max");
 					break;
 				default:
 					throw new ArgumentOutOfRangeException(nameof(state), state, null);
 			}
+		
 		}
 
 		private IEnumerator InitiateRTC()
 		{
 			localPeerConnection.CreateDataChannel("data");
+
+			if (isSender)
+			{
+				MediaStream mediaStream = new MediaStream();
+				VideoStreamTrack videoStreamTrack = new VideoStreamTrack(renderTexture);
+
+				if (streamAudio)
+				{
+					audioStreamTrack = new AudioStreamTrack();
+
+					var transceiver = localPeerConnection.AddTransceiver(TrackKind.Video | TrackKind.Audio);
+					transceiver.Direction = RTCRtpTransceiverDirection.SendOnly;
+					transceivers.Add(transceiver);
+					localPeerConnection.AddTrack(videoStreamTrack, mediaStream);
+					localPeerConnection.AddTrack(audioStreamTrack, mediaStream);
+				}
+				else
+				{
+					var transceiver = localPeerConnection.AddTransceiver(TrackKind.Video);
+					transceiver.Direction = RTCRtpTransceiverDirection.SendOnly;
+					transceivers.Add(transceiver);
+					localPeerConnection.AddTrack(videoStreamTrack, mediaStream);
+				}
+			}
 
 			yield return new WaitForSeconds(1.0f);
 
@@ -362,6 +420,11 @@ namespace VELShareUnity
 
 		private void OnTrack(RTCPeerConnection pc, RTCTrackEvent e)
 		{
+			if (isSender)
+			{
+
+				return;
+			}
 			//Debug.Log("Adding track");
 			if (e.Track is AudioStreamTrack audioTrack)
 			{
@@ -400,6 +463,10 @@ namespace VELShareUnity
 		//this is received from the remote, and is where I create the remote peer
 		private void RtcOffer(string sdp)
 		{
+			if (isSender)
+			{
+				return; 
+			}
 			//Debug.Log("got offer: " + sdp);
 			RTCSessionDescription offer = new RTCSessionDescription
 			{
@@ -493,15 +560,18 @@ namespace VELShareUnity
 		{
 			webRTCCoroutine ??= StartCoroutine(WebRTC.Update());
 
-			if (applyToGlobalMaterial)
+			if (!isSender)
 			{
-				receivedVideoMat = videoMat;
-				previewQuad.GetComponent<MeshRenderer>().sharedMaterial = videoMat;
-			}
-			else
-			{
-				receivedVideoMat = new Material(videoMat);
-				previewQuad.GetComponent<MeshRenderer>().material = receivedVideoMat;
+				if (applyToGlobalMaterial)
+				{
+					receivedVideoMat = videoMat;
+					previewQuad.GetComponent<MeshRenderer>().sharedMaterial = videoMat;
+				}
+				else
+				{
+					receivedVideoMat = new Material(videoMat);
+					previewQuad.GetComponent<MeshRenderer>().material = receivedVideoMat;
+				}
 			}
 
 			Startup(streamRoom);
