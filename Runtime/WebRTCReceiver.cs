@@ -17,6 +17,7 @@ namespace VELShareUnity
 	public class WebRTCReceiver : MonoBehaviour
 	{
 		// some of these may be unnecessary since removing the sender code, which isn't as relevant now that velshare exists
+		public string myid;
 		public string streamRoom = "";
 		private int nextId;
 		public bool initializeOnStart = true;
@@ -108,14 +109,19 @@ namespace VELShareUnity
 					isReceivingData = false;
 					foreach (string statsKey in statsReport.Stats.Keys)
 					{
-						
-						if (statsReport.Stats[statsKey].Dict.ContainsKey("kind") && (string)statsReport.Stats[statsKey].Dict["kind"] == "video")
+						try
 						{
-							ulong bytesReceived = (ulong)statsReport.Stats[statsKey].Dict["bytesReceived"];
-							ulong lastBytes = 0;
-							lastBytesReceived.TryGetValue(statsKey, out lastBytes);
-							isReceivingData |= bytesReceived > lastBytes;
-							lastBytesReceived[statsKey] = bytesReceived;
+							if (statsReport.Stats[statsKey].Dict.ContainsKey("kind") && (string)statsReport.Stats[statsKey].Dict["kind"] == "video" && statsReport.Stats[statsKey].Dict.ContainsKey("bytesReceived"))
+							{
+								ulong bytesReceived = (ulong)statsReport.Stats[statsKey].Dict["bytesReceived"];
+								ulong lastBytes = 0;
+								lastBytesReceived.TryGetValue(statsKey, out lastBytes);
+								isReceivingData |= bytesReceived > lastBytes;
+								lastBytesReceived[statsKey] = bytesReceived;
+							}
+						}catch(Exception e)
+						{
+							Debug.LogError(e.ToString());
 						}
 						
 
