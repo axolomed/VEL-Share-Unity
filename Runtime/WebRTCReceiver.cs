@@ -566,6 +566,11 @@ namespace VELShareUnity
 		{
 			webRTCCoroutine ??= StartCoroutine(WebRTC.Update());
 
+			if (videoMat == null) {
+				Debug.LogWarning("No video material set for WebRTCReceiver. This receiver will not be active.");
+				return;
+			}
+
 			if (!isSender)
 			{
 				if (applyToGlobalMaterial)

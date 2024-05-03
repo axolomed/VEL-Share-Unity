@@ -1,11 +1,11 @@
 {
   "author": "Virtual Experiences Laboratory",
   "name": "edu.uga.engr.vel.velshareunity",
-  "version": "1.0.8",
+  "version": "1.0.10",
   "displayName": "VEL Share Unity",
   "description": "This is used in concert with the VEL Share Application",
   "dependencies": {
     "com.unity.webrtc": "3.0.0-pre.5",
-    "edu.uga.engr.vel.velnet": "1.1.8"
+    "edu.uga.engr.vel.velnet": "1.3.0"
   }
 }
